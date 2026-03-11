@@ -1,0 +1,219 @@
+# Streamlit UI for Agentic AI System (NLP Router Integrated)
+import streamlit as st
+import sys
+import os
+import re
+
+# Add project root to Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import uuid
+from orchestrator.orchestrator_controller import Orchestrator
+from nlp_router import detect_intent, select_agents
+from database import save_chat_history, get_recent_chats
+
+# Page config
+st.set_page_config(page_title="Multi Agent System", layout="wide" )
+
+# -------------------- CSS --------------------
+st.markdown("""
+<style>
+/* === THINKING LOADER === */
+.thinking-container {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    margin: 25px 0;
+}
+
+.brain-loader {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #6366f1, #1e293b);
+    box-shadow: 0 0 20px #6366f1;
+    animation: pulse 1.6s infinite ease-in-out;
+    position: relative;
+}
+
+.brain-loader::before,
+.brain-loader::after {
+    content: "";
+    position: absolute;
+    border-radius: 50%;
+    border: 2px solid rgba(99, 102, 241, 0.4);
+    width: 100%;
+    height: 100%;
+    animation: ripple 2.4s infinite;
+}
+
+.brain-loader::after {
+    animation-delay: 1.2s;
+}
+
+.thinking-text {
+    margin-top: 12px;
+    font-size: 15px;
+    color: #c7d2fe;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); box-shadow: 0 0 18px #6366f1; }
+    50% { transform: scale(1.15); box-shadow: 0 0 32px #818cf8; }
+    100% { transform: scale(1); box-shadow: 0 0 18px #6366f1; }
+}
+
+@keyframes ripple {
+    0% { transform: scale(1); opacity: 0.6; }
+    100% { transform: scale(2.3); opacity: 0; }
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+# -------------------- HEADER --------------------
+st.title("🤖 Multi Agent System")
+st.caption("Clean • Minimal • NLP-Routed")
+
+# -------------------- INIT --------------------
+if "orchestrator" not in st.session_state:
+    st.session_state.orchestrator = Orchestrator()
+if "user_id" not in st.session_state:
+    st.session_state.user_id = str(uuid.uuid4())
+
+# -------------------- SIDEBAR --------------------
+st.sidebar.title("🕒 Chat History")
+st.sidebar.caption("Your recent interactions")
+recent_chats = get_recent_chats(st.session_state.user_id)
+if not recent_chats:
+    st.sidebar.info("No chat history found.")
+else:
+    for chat in recent_chats:
+        with st.sidebar.expander(f"📝 {chat['prompt'][:30]}..."):
+            st.markdown(f"**Agents:** {chat.get('agent', 'Unknown')}")
+            st.markdown(f"**Response:** {chat.get('response', '')[:100]}...")
+            if 'timestamp' in chat:
+                st.caption(f"Time: {chat['timestamp'].strftime('%Y-%m-%d %H:%M:%S')}")
+
+# -------------------- INPUT --------------------
+user_task = st.text_area(
+    "Enter your task",
+    placeholder="Ask anything you want to learn...",
+    height=100
+)
+
+# -------------------- HELPERS --------------------
+def trim_critic(text: str, max_lines=6):
+    if not text:
+        return "No critic feedback available."
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    return "\n".join(lines[:max_lines])
+
+def is_markdown_code(text: str) -> bool:
+    return text.strip().startswith("```")
+
+def extract_code(text: str) -> str:
+    """
+    Extracts code from markdown block WITHOUT changing content.
+    """
+    return re.sub(r"```[a-zA-Z]*|```", "", text).strip()
+
+thinking_ui = st.empty()
+
+thinking_ui.markdown("""
+<div class="thinking-container">
+    <div class="brain-loader"></div>
+    <div class="thinking-text">Thinking deeply…</div>
+</div>
+""", unsafe_allow_html=True)
+
+
+# -------------------- RUN --------------------
+if st.button("Run Task"):
+    if user_task.strip():
+            try:
+                orch = st.session_state.orchestrator
+
+                intent = detect_intent(user_task)
+                agents = select_agents(intent)
+                outputs = {}
+
+                # ---------- GREETING ----------
+                if intent == "GREETING":
+                    greet = orch.research.run(user_task)
+                    st.markdown(greet or "👋 Hi! How can I help you today?")
+
+                # ---------- OTHER ----------
+                else:
+                    if "planner" in agents:
+                        outputs["planner"] = orch.planner.think(user_task)
+
+                    if "research" in agents:
+                        outputs["research"] = orch.research.run(user_task)
+
+                    if "coder" in agents:
+                        outputs["coder"] = orch.coder.think(user_task)
+
+                    if "critic" in agents:
+                        base = outputs.get("coder") or outputs.get("planner") or outputs.get("research")
+                        outputs["critic"] = trim_critic(orch.critic.think(base))
+
+                    # ---------- FINAL ANSWER ----------
+                    st.markdown("### ✅ Answer")
+
+                    # ---- CODE OUTPUT ----
+                    if intent == "CODE" and "coder" in outputs and is_markdown_code(outputs["coder"]):
+                        code_text = extract_code(outputs["coder"])
+
+                        st.code(code_text, language="auto")
+
+                        # Copy button
+                        st.button(
+                            "📋 Copy Code",
+                            key="copy_code",
+                            on_click=lambda: st.session_state.update({"_copied": code_text})
+                        )
+
+                        if "_copied" in st.session_state:
+                            st.toast("Code copied to clipboard!")
+
+                    # ---- TEXT OUTPUT ----
+                    else:
+                        final_answer = outputs.get("planner") or outputs.get("research") or ""
+                        st.markdown(
+                            f"<div class='answer-box'>{final_answer}</div>",
+                            unsafe_allow_html=True
+                        )
+                        print("Click view Details to learn more")
+                    # ---------- DETAILS ----------
+                    with st.expander("🔍 View Agent Details"):
+                        for k, label in [
+                            ("planner", "🧠 Planner Output"),
+                            ("research", "🌐 Research Output"),
+                            ("coder", "💻 Code Output"),
+                            ("critic", "🧪 Critic Feedback"),
+                        ]:
+                            if k in outputs:
+                                st.subheader(label)
+                                st.write(outputs[k])
+
+                # ---------- SAVE HISTORY ----------
+                active_agents = ", ".join(agents) if isinstance(agents, list) else str(agents)
+                if intent == "GREETING":
+                    response_text = greet or "👋 Hi! How can I help you today?"
+                    active_agents = "research"
+                elif intent == "CODE" and "coder" in outputs and is_markdown_code(outputs["coder"]):
+                    response_text = extract_code(outputs["coder"])
+                else:
+                    response_text = outputs.get("planner") or outputs.get("research") or ""
+
+                save_chat_history(st.session_state.user_id, user_task, active_agents, response_text)
+
+                st.success("Task completed successfully")
+                
+            except Exception as e:
+                st.error(f"Error: {e}")
+    else:
+        st.warning("Please enter a task")
+thinking_ui.empty()
