@@ -119,11 +119,10 @@ agentic-ai-system
 │
 ├── router
 │   └── nlp_router.py
-│
-├── assets
-│   ├── background.mp4
-│   └── styles.css
-│
+├──ui
+│   ├── dashboard.py
+│   ├── nlp_router.py
+|
 ├── requirements.txt
 └── README.md
 ```
@@ -144,64 +143,89 @@ agentic-ai-system
 
 ### 1. Clone the Repository
 
-```bash id="tqhmix"
 git clone https://github.com/yourusername/agentic-ai-system.git
 cd agentic-ai-system
-```
 
----
 
 ### 2. Create Virtual Environment
 
-```bash id="61k4rx"
 python -m venv venv
-```
 
-Activate environment:
+Activate the environment:
 
-Windows
+Windows:
 
-```bash id="y21fbf"
 venv\Scripts\activate
-```
 
-Linux/Mac
+Linux / Mac:
 
-```bash id="1r3d5o"
 source venv/bin/activate
-```
 
----
 
 ### 3. Install Dependencies
 
-```bash id="nqfrl1"
 pip install -r requirements.txt
-```
 
----
 
-### 4. Configure MongoDB
+## Configuration
 
-Create a **MongoDB Atlas cluster** and obtain the connection string.
+### 4. Add API Keys
+
+Create a `.env` file in the root directory of the project.
+
+Project structure:
+
+agentic-ai-system
+│
+├── app.py
+├── requirements.txt
+├── database.py
+├── agents
+└── .env
+
+
+Add your API keys inside `.env`:
+
+OPENAI_API_KEY=your_openai_api_key
+
+
+Load the API key in your Python code:
+
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+api_key = os.getenv("OPENAI_API_KEY")
+
+
+### 5. Configure MongoDB
+
+Create a MongoDB Atlas cluster and obtain the connection string.
 
 Update the connection string in `database.py`:
 
-```python id="pftso6"
 MONGO_URI = "your_mongodb_connection_string"
-```
 
----
+Example:
 
-### 5. Run the Application
+mongodb+srv://username:password@cluster.mongodb.net/agentic_ai
 
-```bash id="stzth7"
+
+### 6. Run the Application
+
 streamlit run app.py
-```
 
-The application will open in your browser.
+The application will open automatically in your browser.
 
----
+
+## Security Note
+
+Add `.env` to `.gitignore` to prevent exposing API keys.
+
+.env
+venv/
+__pycache__/
 
 ## Usage
 
