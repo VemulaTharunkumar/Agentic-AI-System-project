@@ -207,11 +207,6 @@ Update the connection string in `database.py`:
 
 MONGO_URI = "your_mongodb_connection_string"
 
-Example:
-
-mongodb+srv://username:password@cluster.mongodb.net/agentic_ai
-
-
 ### 6. Run the Application
 
 streamlit run app.py
