@@ -2,7 +2,6 @@ from agents.planner_agent import PlannerAgent
 from agents.research_agent import ResearchAgent
 from agents.coder_agent import CoderAgent
 from agents.critic_agent import CriticAgent
-from agents.memory_agent import MemoryAgent
 import re
 
 class Orchestrator:
@@ -11,7 +10,6 @@ class Orchestrator:
         self.research = ResearchAgent()
         self.coder = CoderAgent()
         self.critic = CriticAgent()
-        self.memory = MemoryAgent()
 
     # Only generate code if user EXPLICITLY asks
     def is_code_task(self, goal):
